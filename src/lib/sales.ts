@@ -47,21 +47,21 @@ export type VentaResumenOut = {
 };
 
 export function crearVenta(payload: VentaCreateIn) {
-  return apiPost<VentaOut>("/api/v1/ventas", payload);
+  return apiPost<VentaOut>("/api/ventas", payload);
 }
 
 export function pagarVenta(id_venta: number, payload: PagoIn) {
-  return apiPost<PagoOut>(`/api/v1/ventas/${id_venta}/pagos`, payload);
+  return apiPost<PagoOut>(`/api/ventas/${id_venta}/pagos`, payload);
 }
 
 export function obtenerResumenVenta(id_venta: number) {
-  return apiGet<VentaResumenOut>(`/api/v1/ventas/${id_venta}/resumen`);
+  return apiGet<VentaResumenOut>(`/api/ventas/${id_venta}/resumen`);
 }
 
 export function liberarCupo(id_venta: number) {
-  return apiPost<{ ok: boolean }>(`/api/v1/ventas/${id_venta}/liberar`, {});
+  return apiPost<{ ok: boolean }>(`/api/ventas/${id_venta}/liberar`, {});
 }
 
 export function liberarVenta(id_venta: number) {
-  return apiDelete<void>(`/api/v1/ventas/${id_venta}`);
+  return apiDelete<void>(`/api/ventas/${id_venta}`);
 }

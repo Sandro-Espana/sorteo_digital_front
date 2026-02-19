@@ -31,6 +31,7 @@ export function SeatCircle({
   onClick, 
   size = "md" 
 }: SeatCircleProps) {
+  if (typeof number !== "number" || !Number.isFinite(number)) return null;
   const formattedNumber = number.toString().padStart(2, "0");
   const showsNumber = status === "available" || status === "selected";
 

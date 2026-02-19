@@ -36,7 +36,7 @@ export function RaffleHeader() {
         <span className="text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.45)]">🏆</span>
       </div>
 
-      <div className="relative -mt-2">
+      <div className="relative mt-1">
         <div className="pointer-events-none absolute inset-0 z-0">
           <div className="absolute left-2 top-2 h-2 w-2 rounded-full bg-[#FFD700] blur-[1.5px] opacity-[0.12]" />
           <div className="absolute left-8 top-6 h-1.5 w-1.5 rounded-full bg-[#FFD700] blur-[1.5px] opacity-[0.12]" />

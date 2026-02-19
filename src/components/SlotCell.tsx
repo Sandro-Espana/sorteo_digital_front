@@ -1,9 +1,9 @@
-import type { Slot } from "@/lib/types";
+import type { SlotStatus } from "@/lib/types";
 //src/components/SlotCell.tsx
 /**
  * ✅ Estilo del botón según el estado del slot
  */
-function styleByStatus(status: Slot["status"]) {
+function styleByStatus(status: SlotStatus) {
   switch (status) {
     case "PAGADO":
       return "bg-green-50 border-green-500 text-green-900";
@@ -14,7 +14,7 @@ function styleByStatus(status: Slot["status"]) {
   }
 }
 
-function badgeByStatus(status: Slot["status"]) {
+function badgeByStatus(status: SlotStatus) {
   switch (status) {
     case "PAGADO":
       return "bg-green-600 text-white";
@@ -26,11 +26,13 @@ function badgeByStatus(status: Slot["status"]) {
 }
 
 export function SlotCell({
-  slot,
+  number,
+  status,
   label,
   onClick,
 }: {
-  slot: Slot;
+  number: string;
+  status: SlotStatus;
   label: "A" | "B";
   onClick?: () => void;
 }) {
@@ -42,16 +44,16 @@ export function SlotCell({
         "rounded-lg border",
         "flex items-center justify-center gap-2",
         "transition hover:shadow-sm hover:-translate-y-[1px] active:translate-y-0",
-        styleByStatus(slot.status),
+        styleByStatus(status),
       ].join(" ")}
-      title={`${label} ${slot.number} - ${slot.status}`}
+      title={`${label} ${number} - ${status}`}
       type="button"
     >
-      <span className={`text-[10px] font-extrabold rounded px-2 py-0.5 ${badgeByStatus(slot.status)}`}>
+      <span className={`text-[10px] font-extrabold rounded px-2 py-0.5 ${badgeByStatus(status)}`}>
         {label}
       </span>
       <span className="text-base sm:text-lg font-extrabold tracking-wider">
-        {slot.number}
+        {number}
       </span>
     </button>
   );

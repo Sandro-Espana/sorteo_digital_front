@@ -242,7 +242,7 @@ export function SaleModal({
               onClick={onCrearVenta}
               disabled={!canCreateVenta}
               className={[
-                "w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors",
+                "w-full rounded-lg px-4 py-2 text-sm font-bold transition-colors",
                 canCreateVenta
                   ? "bg-blue-600 text-white hover:bg-blue-700"
                   : "bg-blue-300 text-white cursor-not-allowed",

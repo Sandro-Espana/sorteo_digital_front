@@ -21,8 +21,11 @@ export function DigitalRaffleGrid({
   size = "sm" // Por defecto tamaño pequeño
 }: DigitalRaffleGridProps) {
   const seats = useMemo(() => {
-    if (Array.isArray(seatNumbers)) {
-      return [...seatNumbers].sort((a, b) => a - b).map((n) => ({ number: n }));
+    if (Array.isArray(seatNumbers) && seatNumbers.length > 0) {
+      const cleaned = [...new Set(seatNumbers.filter((n): n is number => typeof n === "number" && Number.isFinite(n)))];
+      if (cleaned.length > 0) {
+        return cleaned.sort((a, b) => a - b).map((n) => ({ number: n }));
+      }
     }
 
     return Array.from({ length: maxSeats }, (_, index) => ({ number: index }));
@@ -41,9 +44,9 @@ export function DigitalRaffleGrid({
     <div className="max-w-2xl mx-auto">
       <div className="rounded-[22px] bg-white/10 backdrop-blur-md border border-white/20 shadow-[0_18px_50px_rgba(0,0,0,0.45)] px-0.5 py-0.5">
         <div className="grid grid-cols-10 gap-x-2 gap-y-1 justify-items-center">
-          {seats.map((seat) => (
+          {seats.map((seat, idx) => (
             <SeatCircle
-              key={seat.number}
+              key={`seat-${String(seat.number)}-${idx}`}
               number={seat.number}
               status={getSeatStatus(seat.number)}
               onClick={() => handleSeatClick(seat.number)}

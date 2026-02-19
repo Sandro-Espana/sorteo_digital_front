@@ -1,4 +1,4 @@
-import type { Seat, Slot, SlotStatus } from "./types";
+import type { Seat, SlotStatus } from "./types";
 import { apiGet, SORTEO_ID } from "./api";
 
 // Tipo para la respuesta del sorteo
@@ -46,7 +46,7 @@ function formatDateOnly(input: string): string {
 // Función para obtener los valores dinámicos desde la base de datos
 export async function fetchRaffleData(): Promise<void> {
   try {
-    const data = await apiGet<SorteoInfo>(`/api/v1/sorteos/${SORTEO_ID}`);
+    const data = await apiGet<SorteoInfo>(`/api/sorteos/${SORTEO_ID}`);
     if (data) {
       // Actualizar solo los valores dinámicos
       if (data.id_sorteo) {
@@ -96,17 +96,9 @@ function demoStatus(n: number): SlotStatus {
 export function generateSeats(): Seat[] {
   const seats: Seat[] = [];
   for (let i = 0; i < 500; i++) { // Mantenemos 500 puestos totales
-    const aNum = i * 2;       // 0,2,4...
-    const bNum = i * 2 + 1;   // 1,3,5...
-
-    const chanceA: Slot = { number: to3(aNum), status: demoStatus(aNum) };
-    const chanceB: Slot = { number: to3(bNum), status: demoStatus(bNum) };
-
     seats.push({
       id: i + 1,
       status: demoStatus(i + 1), // Agregar el status basado en el ID del puesto
-      chanceA,
-      chanceB,
     });
   }
   return seats;

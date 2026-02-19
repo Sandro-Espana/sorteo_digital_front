@@ -1,17 +1,68 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import type { CarteraItem, CarteraQuery } from "@/lib/cartera";
 import { carteraQueryToSearchParams } from "@/lib/cartera";
 
-function getToken() {
-  if (typeof window === "undefined") return null;
-  return (
-    window.localStorage.getItem("token") ||
-    window.localStorage.getItem("access_token") ||
-    window.localStorage.getItem("jwt")
-  );
+function hashToStableNegativeInt(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (h << 5) - h + input.charCodeAt(i);
+    h |= 0;
+  }
+  if (h === 0) h = 1;
+  return -Math.abs(h);
+}
+
+function normalizeCarteraItem(raw: any, idx: number): CarteraItem {
+  const nombre =
+    typeof raw?.cliente_nombre === "string"
+      ? raw.cliente_nombre
+      : typeof raw?.nombre === "string"
+        ? raw.nombre
+        : "";
+
+  const telefono =
+    typeof raw?.cliente_telefono === "string"
+      ? raw.cliente_telefono
+      : typeof raw?.telefono === "string"
+        ? raw.telefono
+        : null;
+
+  const total =
+    typeof raw?.total === "number"
+      ? raw.total
+      : typeof raw?.total_venta === "number"
+        ? raw.total_venta
+        : 0;
+
+  const abonado =
+    typeof raw?.abonado === "number"
+      ? raw.abonado
+      : typeof raw?.total_abonado === "number"
+        ? raw.total_abonado
+        : 0;
+
+  const saldo = typeof raw?.saldo === "number" ? raw.saldo : 0;
+
+  const idVenta =
+    typeof raw?.id_venta === "number" && Number.isFinite(raw.id_venta)
+      ? raw.id_venta
+      : hashToStableNegativeInt(`${nombre}|${telefono ?? ""}|${total}|${abonado}|${saldo}|${idx}`);
+
+  return {
+    id_venta: idVenta,
+    puesto: typeof raw?.puesto === "number" ? raw.puesto : null,
+    puestos: Array.isArray(raw?.puestos) ? raw.puestos : undefined,
+    cliente_nombre: nombre,
+    cliente_telefono: telefono,
+    total,
+    abonado,
+    saldo,
+    vendedor_id: typeof raw?.vendedor_id === "number" ? raw.vendedor_id : null,
+    vendedor_color: typeof raw?.vendedor_color === "string" ? raw.vendedor_color : null,
+  };
 }
 
 export function useCartera() {
@@ -43,29 +94,22 @@ export function useCartera() {
 
         const params = carteraQueryToSearchParams(query);
         const qs = params.toString();
-        const url = `${API_BASE_URL}/api/v1/cartera${qs ? `?${qs}` : ""}`;
+        const path = `/api/cartera${qs ? `?${qs}` : ""}`;
+        const data = await apiGet<unknown>(path);
 
-        const token = getToken();
-        const res = await fetch(url, {
-          cache: "no-store",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-
-        if (!res.ok) {
-          let detail = "";
-          try {
-            const body: any = await res.json();
-            detail = body?.detail ?? "";
-          } catch {
-            detail = "";
-          }
-          throw new Error(detail || `HTTP ${res.status}`);
+        if (!Array.isArray(data)) {
+          setItems([]);
+          return;
         }
 
-        const data = (await res.json()) as unknown;
-        setItems(Array.isArray(data) ? (data as CarteraItem[]) : []);
+        const normalized = (data as any[]).map((it, idx) => normalizeCarteraItem(it, idx));
+        setItems(normalized);
       } catch (e: any) {
-        setError(e?.message ?? "Error cargando cartera");
+        const raw = String(e?.message ?? "");
+        const msg = raw.includes("401")
+          ? "No autorizado (401). Inicia sesión para ver la cartera."
+          : raw || "Error cargando cartera";
+        setError(msg);
         setItems([]);
       } finally {
         setLoading(false);

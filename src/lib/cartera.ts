@@ -1,14 +1,15 @@
 export type CarteraItem = {
-  id_venta: number;
-  puesto?: number | null;
-  puestos?: number[];
-  cliente_nombre: string;
-  cliente_telefono?: string | null;
+  id: number;
+  nombre: string;
+  telefono: string | null;
   total: number;
   abonado: number;
   saldo: number;
   vendedor_id?: number | null;
   vendedor_color?: string | null;
+
+  puesto?: number | null;
+  puestos?: number[];
 };
 
 export type CarteraQuery = {

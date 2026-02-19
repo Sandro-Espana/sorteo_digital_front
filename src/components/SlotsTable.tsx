@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiGet, SORTEO_ID } from "@/lib/api";
-import { puestoToSeat, type PuestoOut } from "@/lib/adapters";
+import { apiGet, API_BASE_URL, SORTEO_ID } from "@/lib/api";
+import { puestoClasificadoToSeat, type PuestoClasificadoOut } from "@/lib/adapters";
 import type { Seat } from "@/lib/types";
 import { crearVenta, pagarVenta, obtenerResumenVenta, liberarCupo } from "@/lib/sales";
 import { RaffleHeader } from "@/components/RaffleHeader";
@@ -10,7 +10,7 @@ import { DigitalRaffleGrid } from "@/components/DigitalRaffleGrid";
 import { SaleModal } from "@/components/SaleModal";
 import { AbonoModal } from "./AbonoModal";
 import { SeatContextModal } from "./SeatContextModal";
-import { Footer } from "@/components/Footer";
+import { PuestosFooter } from "@/components/PuestosFooter";
 import type { SeatStatus } from "@/components/SeatCircle";
 import {
   type ClienteForm,
@@ -20,8 +20,9 @@ import {
 } from "@/lib/validators";
 
 function seatIsDisponible(seat: Seat) {
-  const st = seat.status ?? "DISPONIBLE";
-  return st === "DISPONIBLE" || st === "ANULADO";
+  if (typeof seat?.can_venderse === "boolean") return seat.can_venderse;
+  const estado = String(seat?.estado_actual ?? seat?.status ?? "").toUpperCase();
+  return estado === "DISPONIBLE";
 }
 
 function inputClass(hasError: boolean) {
@@ -36,6 +37,8 @@ export function SlotsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paidMessage, setPaidMessage] = useState<string | null>(null);
+
+  const [currentSorteoId, setCurrentSorteoId] = useState<number>(SORTEO_ID);
 
   // ✅ selección de puestos
   const [selected, setSelected] = useState<number[]>([]);
@@ -63,15 +66,16 @@ export function SlotsTable() {
   const [isSeatContextOpen, setIsSeatContextOpen] = useState(false);
   const [contextSeat, setContextSeat] = useState<Seat | null>(null);
 
-  async function refreshSeats() {
-    const data = await apiGet<unknown>(`/api/v1/sorteos/${SORTEO_ID}/puestos`);
-    if (!Array.isArray(data)) {
+  async function refreshSeats(idSorteo: number) {
+    const data = await apiGet<any>(`/api/sorteos/${encodeURIComponent(String(idSorteo))}/puestos-clasificados`);
+    const puestos = Array.isArray(data?.puestos) ? (data.puestos as PuestoClasificadoOut[]) : null;
+    if (!puestos) {
       throw new Error(
-        `Respuesta inesperada del endpoint /api/v1/sorteos/${SORTEO_ID}/puestos. Se esperaba un arreglo de puestos, pero llegó un objeto. Revisa NEXT_PUBLIC_API_BASE_URL y la ruta del backend.`
+        `Respuesta inesperada del endpoint /api/sorteos/${encodeURIComponent(String(idSorteo))}/puestos-clasificados. Se esperaba un objeto { puestos: [] }.`
       );
     }
 
-    const mapped = (data as PuestoOut[]).map(puestoToSeat);
+    const mapped = puestos.map(puestoClasificadoToSeat);
     setSeats(mapped);
   }
 
@@ -83,7 +87,25 @@ export function SlotsTable() {
         setLoading(true);
         setError(null);
 
-        await refreshSeats();
+        let idSorteo = SORTEO_ID;
+        try {
+          const sorteos = await apiGet<unknown>("/api/sorteos");
+          const arr = Array.isArray(sorteos)
+            ? (sorteos as any[])
+            : Array.isArray((sorteos as any)?.sorteos)
+              ? (sorteos as any).sorteos
+              : [];
+          const activos = arr
+            .filter((s: any) => String(s?.estado ?? "").toUpperCase() === "ACTIVO")
+            .map((s: any) => Number(s?.id_sorteo ?? s?.id))
+            .filter((n: any) => Number.isFinite(n) && n > 0)
+            .sort((a: number, b: number) => b - a);
+          if (activos.length) idSorteo = activos[0];
+        } catch {}
+
+        if (!alive) return;
+        setCurrentSorteoId(idSorteo);
+        await refreshSeats(idSorteo);
       } catch (e: any) {
         if (alive) setError(e?.message ?? "Error cargando puestos");
       } finally {
@@ -117,13 +139,26 @@ export function SlotsTable() {
   const seatStatusByNumber = useMemo(() => {
     const m: Record<number, SeatStatus> = {};
     for (const s of seats) {
+      if (s.is_disponible) {
+        m[s.id] = "available";
+        continue;
+      }
+      if (s.is_bloqueado || s.is_anulado) {
+        m[s.id] = "blocked";
+        continue;
+      }
+      if (s.is_vendido) {
+        m[s.id] = "sold";
+        continue;
+      }
+      if (s.is_reservado) {
+        m[s.id] = "reserved";
+        continue;
+      }
       const st = s.status ?? "DISPONIBLE";
-      const pendingBySaldo = typeof s.saldo === "number" && s.saldo > 0;
-      const pendingByTotals =
-        typeof s.total === "number" && typeof s.abonado === "number" && s.abonado < s.total;
-      const pending = pendingBySaldo || pendingByTotals;
-      if (st === "DISPONIBLE" || st === "ANULADO") m[s.id] = "available";
-      else if (st === "RESERVADO" || pending) m[s.id] = "reserved";
+      if (st === "DISPONIBLE") m[s.id] = "available";
+      else if (st === "RESERVADO") m[s.id] = "reserved";
+      else if (st === "BLOQUEADO" || st === "ANULADO") m[s.id] = "blocked";
       else m[s.id] = "sold";
     }
     return m;
@@ -144,6 +179,40 @@ export function SlotsTable() {
 
   function closeModal() {
     setIsModalOpen(false);
+  }
+
+  function getToken() {
+    if (typeof window === "undefined") return null;
+    return (
+      window.localStorage.getItem("token") ||
+      window.localStorage.getItem("access_token") ||
+      window.localStorage.getItem("jwt")
+    );
+  }
+
+  async function downloadComprobante(idVenta: number) {
+    const url = `${API_BASE_URL}/api/ventas/${encodeURIComponent(String(idVenta))}/comprobante.png`;
+    const token = getToken();
+
+    const res = await fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!res.ok) throw new Error("No se pudo generar el comprobante");
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = `comprobante_venta_${idVenta}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(objectUrl);
   }
 
   function cancelProceso() {
@@ -182,7 +251,7 @@ export function SlotsTable() {
       const c = normalizeClienteForm(cliente);
 
       const payload = {
-        id_sorteo: SORTEO_ID,
+        id_sorteo: currentSorteoId,
         puestos: selected,
         cliente: {
           nombres: c.nombres,
@@ -195,12 +264,22 @@ export function SlotsTable() {
 
       const venta = await crearVenta(payload);
 
+      // UX: cerrar el modal apenas se crea la venta
+      closeModal();
+
+      // Descargar comprobante sin bloquear el render
+      window.setTimeout(() => {
+        downloadComprobante(venta.id_venta).catch(() => {
+          // silencioso: no bloquea la venta
+        });
+      }, 0);
+
       const monto = Number(abonoInicial.replace(/[^0-9]/g, ""));
       if (Number.isFinite(monto) && monto > 0) {
         await pagarVenta(venta.id_venta, { monto });
       }
 
-      await refreshSeats();
+      await refreshSeats(currentSorteoId);
       setSelected([]);
       setCliente({
         nombres: "",
@@ -211,7 +290,6 @@ export function SlotsTable() {
       });
       setTouched({});
       setAbonoInicial("");
-      closeModal();
     } catch (e: any) {
       setError(e?.message ?? "Error creando venta");
     } finally {
@@ -244,7 +322,7 @@ export function SlotsTable() {
       setSubmitting(true);
       setError(null);
       await pagarVenta(abonoSeat.id_venta, { monto });
-      await refreshSeats();
+      await refreshSeats(currentSorteoId);
       closeAbonoModal();
     } catch (e: any) {
       setError(e?.message ?? "Error registrando abono");
@@ -278,7 +356,7 @@ export function SlotsTable() {
       {!loading && !error && seats.length === 0 && (
         <div className="mx-auto w-full max-w-md px-2">
           <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            No hay puestos para mostrar. El endpoint /api/v1/sorteos/{SORTEO_ID}/puestos está respondiendo un arreglo vacío.
+            No hay puestos para mostrar. El endpoint /api/sorteos/{String(currentSorteoId)}/puestos-clasificados está respondiendo vacío.
             Revisa en la BD/Backend que el sorteo tenga generados sus puestos (por ejemplo, que total_boletas no sea 0).
           </div>
         </div>
@@ -293,11 +371,10 @@ export function SlotsTable() {
               onSeatSelect={(seatNumber) => {
                 const seat = seats.find((s) => s.id === seatNumber);
                 if (!seat) {
-                  setError(`No se encontró el puesto ${String(seatNumber).padStart(2, "0")} en la lista cargada. Verifica el endpoint /api/v1/sorteos/${SORTEO_ID}/puestos.`);
+                  setError(`No se encontró el puesto ${String(seatNumber).padStart(2, "0")} en la lista cargada. Verifica el endpoint /api/sorteos/${String(currentSorteoId)}/puestos-clasificados.`);
                   return;
                 }
-                const st = seat.status ?? "DISPONIBLE";
-                if (st === "DISPONIBLE" || st === "ANULADO") {
+                if (seatIsDisponible(seat)) {
                   toggleSeat(seat);
                   return;
                 }
@@ -323,7 +400,7 @@ export function SlotsTable() {
 
       {/* Footer - Altura fija */}
       <div className="flex-shrink-0 mt-1">
-        <Footer />
+        <PuestosFooter />
       </div>
 
       {/* Modal de venta */}
@@ -372,7 +449,8 @@ export function SlotsTable() {
             setSubmitting(true);
             setError(null);
             await liberarCupo(contextSeat.id_venta);
-            await refreshSeats();
+            await refreshSeats(currentSorteoId);
+            closeSeatContextModal();
           } catch (e: any) {
             setError(e?.message ?? "Error liberando cupo");
           } finally {

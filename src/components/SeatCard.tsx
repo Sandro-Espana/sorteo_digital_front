@@ -2,12 +2,7 @@ import type { Seat, SlotStatus } from "@/lib/types";
 // src/components/SeatCard.tsx
 
 function seatStatus(seat: Seat): SlotStatus {
-  const a = seat.chanceA.status;
-  const b = seat.chanceB.status;
-
-  if (a === "PAGADO" || b === "PAGADO") return "PAGADO";
-  if (a === "RESERVADO" || b === "RESERVADO") return "RESERVADO";
-  return "DISPONIBLE";
+  return seat.status ?? "DISPONIBLE";
 }
 
 function seatClasses(status: SlotStatus) {
@@ -52,18 +47,8 @@ export function SeatCard({
       title={`Puesto #${seat.id} - ${status}`}
     >
       {/* Número del puesto - pequeño y sutil */}
-      <div className={["text-[9px] font-medium mb-1", seatHeaderText(status)].join(" ")}>
+      <div className={[("text-[9px] font-medium mb-1"), seatHeaderText(status)].join(" ")}>
         #{seat.id}
-      </div>
-      
-      {/* Oportunidades - prominentes */}
-      <div className="flex items-center gap-0.5">
-        <span className={["text-xs font-bold tabular-nums", seatHeaderText(status)].join(" ")}>
-          {seat.chanceA.number}
-        </span>
-        <span className={["text-xs font-bold tabular-nums", seatHeaderText(status)].join(" ")}>
-          {seat.chanceB.number}
-        </span>
       </div>
     </button>
   );
